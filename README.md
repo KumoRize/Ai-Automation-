@@ -1,37 +1,133 @@
-# Post Once. Go Live on Five Platforms. Pay Nothing.
+# Social Autopilot
 
-Posting to Instagram, Facebook, TikTok, YouTube and X usually means building the same post five times. This web app cuts that to one upload. You create the post once, and the AI agent publishes it to every channel you've connected, free.
+Upload a post once and publish it to Instagram, Facebook, TikTok, YouTube and X at the same time. Keyword comment automation (like ManyChat) sends people your link by DM, and an AI generator writes trending hashtags, keywords and captions in your style.
 
-## What it does
+It's free and open source. You run it yourself, and each platform's API is free to use, except X, which charges per post (see [Costs](#costs)).
 
-| Feature | What you get |
+## Features
+
+| Feature | What it does |
 |---|---|
-| **One-upload publishing** | Upload a video, image or text post once. It goes out to Instagram, Facebook, TikTok, YouTube and X, formatted for each one. |
-| **Keyword automation** | Set a different trigger word for each post. If someone comments "GUIDE" on your reel, they get an automatic DM. This is the comment-to-DM flow ManyChat made popular. |
-| **Comment automation** | Reply to comments automatically with saved or AI-written answers, so questions don't go unanswered. |
-| **Direct links** | Attach a link to any upload. It can go in the caption, in the automatic DM, or in both. |
-| **AI generator** | Enter a topic and get trending hashtags, trending keywords and a caption in a distinctive style. |
+| **One upload, five channels** | Add a photo, video or text post, tick the accounts, and publish now or schedule it. Each platform gets a caption trimmed to its own limits. |
+| **Keyword DM automation** | Set trigger words per post or for all posts. When someone comments "LINK", they get a DM with your link and an optional public reply. |
+| **Comment auto-replies** | Reply publicly to every comment, or only to comments with certain words. |
+| **Direct links** | Save a link on each post. It can go in the caption, in the DM, or both. |
+| **AI generator** | Describe your post and get 15–25 hashtags, search keywords, a hook, a title and a caption in your chosen style. It can check live web trends first. |
+| **Demo accounts** | Try every feature without connecting real accounts. Nothing gets posted. |
+| **Activity log** | Shows each comment received, which rule it matched, and what was sent. |
 
-## How it works
+## What each platform supports
 
-1. **Connect** your five accounts once.
-2. **Upload** your content and add a link if you want one.
-3. **Generate** hashtags, keywords and a caption, then edit them.
-4. **Set a keyword** so comments on that post trigger a DM.
-5. **Publish** to every channel at once, or schedule it for later.
+| | Instagram | Facebook Page | TikTok | YouTube | X |
+|---|---|---|---|---|---|
+| Text post | – | ✓ | – | – | ✓ |
+| Image | ✓ (JPEG) | ✓ | ✓ | – | ✓ |
+| Video | ✓ (Reels) | ✓ | ✓ | ✓ | ✓ |
+| Public comment reply | ✓ | ✓ | – | ✓ | ✓ |
+| DM to commenter | ✓ | ✓ | – | – | ✓ |
+| How comments arrive | webhook | webhook | not available | checked every 5 min | checked every 5 min (opt-in) |
 
-## Price: free
+TikTok's public API has no endpoints for comment replies or DMs, so comment automation can't work there. YouTube has no DMs.
 
-Every feature above is free today. More updates are on the way.
+## Quick start (about 5 minutes)
 
-## Platform rules to know before launch
+You need Node.js 22.5 or newer.
 
-These limits are set by the platforms, not the app:
+```bash
+npm install
+cp .env.example .env.local     # then set APP_PASSWORD and APP_SECRET
+npm run build && npm start     # or: npm run dev
+```
 
-- **Instagram** lets apps publish only to Professional (Business or Creator) accounts. Messaging features need Meta App Review first. ([Meta docs](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/content-publishing))
-- **TikTok** keeps posts from an app that hasn't passed its audit private ("Only me") until the audit is approved. ([TikTok docs](https://developers.tiktok.com/doc/content-sharing-guidelines))
-- **X** reportedly closed its free API tier to new projects in February 2026. It now charges per post, about $0.015 for text and $0.20 for a post with a link. That cost could affect the "free" promise, so check current pricing on X's developer portal. ([PostProxy](https://www.postproxy.dev/blog/x-api-pricing-2026/), third-party source)
+Open http://localhost:3000 and log in with your password. Then:
 
-## Get started
+1. Go to **Accounts** and click **Add demo account** for each platform.
+2. Go to **Create post**, add a photo, turn on **Keyword DM automation**, and publish.
+3. Go to **Automations** and use **Test a comment** to see the DM the rule would send.
 
-Connect your first account, upload one post and add a keyword. Then watch it go live on all five channels in a single step.
+To try the AI generator, set `ANTHROPIC_API_KEY` (get one at [console.anthropic.com](https://console.anthropic.com)).
+
+## Connecting real accounts
+
+Each platform needs a free developer app. The **Setup** page in the app lists the exact callback URL to paste into each one.
+
+**Real posting needs a public HTTPS address.** Instagram, Facebook and TikTok download your media from the app, and Meta sends comment webhooks to it. Deploy the app to a server, or run a tunnel such as `ngrok http 3000` or Cloudflare Tunnel, then set `APP_URL` to that address.
+
+| Platform | Where to create the app | What to enable | Env vars |
+|---|---|---|---|
+| Instagram | [Meta for Developers](https://developers.facebook.com/apps) → Business app → **Instagram API with Instagram Login** | Permissions: `instagram_business_basic`, `instagram_business_content_publish`, `instagram_business_manage_comments`, `instagram_business_manage_messages`. Webhook field: **comments** | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` |
+| Facebook | Same Meta app → **Facebook Login for Business** + **Pages API** | Permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`. Page webhook field: **feed** | `META_APP_ID`, `META_APP_SECRET` |
+| Meta webhooks | Meta app → Webhooks (Instagram and Page objects) | Callback `APP_URL/api/webhooks/meta`, with any verify token you choose | `META_WEBHOOK_VERIFY_TOKEN` |
+| TikTok | [TikTok for Developers](https://developers.tiktok.com/apps) | Login Kit + Content Posting API (Direct Post). Scopes: `user.info.basic`, `video.publish`, `video.upload` | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` |
+| YouTube | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | Enable YouTube Data API v3. Create an OAuth client of type Web application | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| X | [X Developer Console](https://developer.x.com/en/portal/dashboard) | User authentication: OAuth 2.0, type Web App, read + write + DM | `X_CLIENT_ID`, `X_CLIENT_SECRET` |
+
+Restart the app after changing env vars, then use **Connect** on the Accounts page.
+
+### Platform approvals you should know about
+
+These limits come from the platforms, not from this app:
+
+- **Instagram and Facebook:** until Meta App Review approves your permissions, only people with a role on your Meta app (you and your testers) can connect. Instagram publishing only works with Professional (Business or Creator) accounts. A comment can get one private-reply DM, within 7 days of the comment. ([Meta docs](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/content-publishing))
+- **TikTok:** until your app passes TikTok's audit, posts are private ("Only me") and at most 5 accounts can post per day. ([TikTok docs](https://developers.tiktok.com/doc/content-sharing-guidelines))
+- **YouTube:** videos uploaded by API projects that Google hasn't audited are locked to private. Each upload uses 1,600 of the default 10,000 daily quota units, so about 6 uploads a day.
+- **X:** see Costs below.
+
+## Costs
+
+- **This app** is free.
+- **Meta, TikTok and YouTube APIs** are free to use.
+- **X** closed its free API tier to new projects in February 2026, according to reports, and now bills each call: about $0.015 per text post and about $0.20 per post with a link ([source](https://www.postproxy.dev/blog/x-api-pricing-2026/), third party; check current prices in the X developer console). Reading replies for reply automation is also billed, which is why `X_POLL_REPLIES` is off by default.
+- **AI generator:** billed by Anthropic per use. Live trend search adds a web-search charge. Turn it off in the generator for cheaper, faster results.
+
+## Deploying
+
+Social Autopilot is a standard Next.js app that keeps its data in a SQLite file (`DATA_DIR`, default `./data`). It runs on any server or VPS with a persistent disk, for example Railway, Render, Fly.io or a $5 VPS.
+
+- Run `npm run build` and then `npm start` behind HTTPS, and set `APP_URL` to the public address.
+- A built-in timer publishes scheduled posts and checks YouTube/X comments every minute.
+- Serverless hosts without a persistent disk (such as Vercel) need a different database, so they aren't supported as-is. If your host stops idle servers, set `CRON_SECRET` and call `GET /api/cron` with `Authorization: Bearer <CRON_SECRET>` every minute.
+- Back up the `DATA_DIR` folder. It holds your posts, rules and encrypted platform tokens.
+
+## Security
+
+- The app has one user and a single password. Logins are rate-limited.
+- Platform tokens are encrypted at rest (AES-256-GCM) with a key derived from `APP_SECRET`. Changing `APP_SECRET` logs you out and requires reconnecting accounts.
+- Meta webhooks are checked against the `X-Hub-Signature-256` signature. Unsigned calls are rejected.
+- Uploaded media is served at `/media/<random-id>` without login, because the platforms have to download it. Don't upload anything you wouldn't post.
+
+## Project layout
+
+```
+src/
+  app/(app)/          Pages: dashboard, compose, posts, automations, generator, accounts, setup
+  app/api/            Login, OAuth connect/callback, posts, automations, AI, Meta webhooks, cron
+  app/media/[file]    Public media URLs for platforms to download
+  lib/platforms/      One adapter per platform (OAuth, publish, reply, DM, comment polling)
+  lib/publisher.ts    Publishing to all selected accounts, with retries and status
+  lib/automation.ts   Keyword matching and comment → reply/DM handling
+  lib/ai.ts           Claude-powered hashtag/keyword/caption generator
+  lib/scheduler.ts    Scheduled posts and YouTube/X comment polling
+tests/                Unit tests (npm test)
+```
+
+## Development
+
+```bash
+npm run dev         # start in development mode
+npm test            # unit tests
+npm run typecheck   # TypeScript
+```
+
+## Status
+
+Built and checked so far:
+
+- Unit tests cover caption limits, keyword matching, webhook parsing and signatures, encryption and sessions.
+- End to end with demo accounts: login, publishing, scheduling, webhook-triggered DMs, duplicate-comment protection, and the cron endpoint.
+
+Not yet checked: the real platform API calls and the AI generator have never run against live services, because that needs your developer apps and API keys. The X media upload in particular follows X's documented v2 endpoints but hasn't been run live. If a platform returns an error, it appears on the **Posts** page next to that account.
+
+## Roadmap ideas
+
+Multi-user workspaces, analytics, a content calendar, carousel posts, LinkedIn/Threads/Pinterest, and AI auto-replies.
