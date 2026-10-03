@@ -53,7 +53,7 @@ Add one or more keys to `.env.local`, then restart. The first three cost nothing
 
 | Option | How to get it | What you get |
 |---|---|---|
-| **Google Gemini** (recommended) | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No card needed. Set `GEMINI_API_KEY`. | Good captions, plus **live trend checks with Google Search** on the free daily allowance of `gemini-2.5-flash` |
+| **Google Gemini** (recommended) | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No card needed. Set `GEMINI_API_KEY`. | Good captions, plus **live trend checks with Google Search** where your free allowance includes it. The app picks the newest Gemini model your key can use, so it keeps working when Google retires old models |
 | **Groq** | Create a key at [console.groq.com/keys](https://console.groq.com/keys). Set `GROQ_API_KEY`. | Very fast Llama 3.3 70B. No live trend search |
 | **Ollama** | Install [ollama.com](https://ollama.com), run `ollama pull llama3.1`, set `OLLAMA_MODEL=llama3.1` | Runs on your own computer: private, no limits, no internet needed |
 | **Anthropic Claude** (paid, optional) | Create a key at [console.anthropic.com](https://console.anthropic.com). Set `ANTHROPIC_API_KEY` | The strongest writing, plus live trend checks with web search. Billed per use |

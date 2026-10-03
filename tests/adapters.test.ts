@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { aiStatus, generateContent } from "@/lib/ai";
 import { generateBasic } from "@/lib/ai/basic";
 import { generateWithClaude } from "@/lib/ai/claude";
-import { generateWithGemini } from "@/lib/ai/gemini";
+import { generateWithGemini, pickGeminiModel } from "@/lib/ai/gemini";
 import { generateWithOpenAICompatible } from "@/lib/ai/openai-compatible";
 import { extractJson } from "@/lib/ai/schema";
 import { config } from "@/lib/config";
@@ -300,6 +300,53 @@ describe("Gemini (free tier)", () => {
     const out = await generateWithGemini("key-1", "gemini-2.5-flash", aiReq);
     expect(out.caption).toBe("Caption text");
     expect(out.liveChecked).toBe(false);
+  });
+});
+
+describe("Gemini model selection", () => {
+  it("prefers the newest stable flash model and skips special-purpose ones", () => {
+    expect(
+      pickGeminiModel([
+        "models/gemini-2.5-flash",
+        "models/gemini-3.8-flash",
+        "models/gemini-3.8-flash-lite",
+        "models/gemini-3.9-flash-image",
+        "models/gemini-3.9-pro-preview",
+        "models/gemini-embedding-001",
+      ]),
+    ).toBe("gemini-3.8-flash");
+    expect(pickGeminiModel(["models/gemini-4.0-flash-preview", "models/gemini-3.1-pro"])).toBe("gemini-4.0-flash-preview");
+    expect(pickGeminiModel(["models/text-embedding-004"])).toBeNull();
+  });
+
+  it("looks up available models when none is configured", async () => {
+    fakeFetch((c) => {
+      if (c.method === "GET")
+        return json({
+          models: [
+            { name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/gemini-embedding-001", supportedGenerationMethods: ["embedContent"] },
+          ],
+        });
+      return json({ candidates: [{ content: { parts: [{ text: JSON.stringify(modelJson) }] } }] });
+    });
+    const out = await generateWithGemini("key-discover", undefined, { ...aiReq, liveTrends: false });
+    expect(calls[0].url).toMatch(/\/v1beta\/models\?pageSize=1000$/);
+    expect(calls[1].url).toContain("/models/gemini-3.8-flash:generateContent");
+    expect(out.provider).toBe("Google Gemini (gemini-3.8-flash)");
+  });
+
+  it("switches to an available model when Google has retired the configured one", async () => {
+    fakeFetch((c) => {
+      if (c.url.includes("gemini-2.5-flash:"))
+        return json({ error: { code: 404, message: "This model models/gemini-2.5-flash is no longer available to new users." } }, { status: 404 });
+      if (c.method === "GET")
+        return json({ models: [{ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] }] });
+      return json({ candidates: [{ content: { parts: [{ text: JSON.stringify(modelJson) }] } }] });
+    });
+    const out = await generateWithGemini("key-retired", "gemini-2.5-flash", aiReq);
+    expect(out.provider).toBe("Google Gemini (gemini-3.8-flash)");
+    expect(out.caption).toBe("Caption text");
   });
 });
 

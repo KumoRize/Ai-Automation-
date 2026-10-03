@@ -50,7 +50,8 @@ export const config = {
     /** auto | gemini | groq | ollama | custom | basic. "auto" picks the first one that has a key. */
     provider: (env("AI_PROVIDER") ?? "auto").toLowerCase(),
     geminiKey: env("GEMINI_API_KEY"),
-    geminiModel: env("GEMINI_MODEL") ?? "gemini-2.5-flash",
+    /** Leave unset to use the newest Gemini model the key can access (Google retires old ones). */
+    geminiModel: env("GEMINI_MODEL"),
     groqKey: env("GROQ_API_KEY"),
     groqModel: env("GROQ_MODEL") ?? "llama-3.3-70b-versatile",
     ollamaUrl: (env("OLLAMA_URL") ?? "http://localhost:11434").replace(/\/+$/, ""),
