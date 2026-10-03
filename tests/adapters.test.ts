@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { aiStatus, generateContent } from "@/lib/ai";
 import { generateBasic } from "@/lib/ai/basic";
 import { generateWithClaude } from "@/lib/ai/claude";
-import { generateWithGemini, pickGeminiModel } from "@/lib/ai/gemini";
+import { generateWithGemini, pickGeminiModel, resetGeminiSearchPause } from "@/lib/ai/gemini";
 import { generateWithOpenAICompatible } from "@/lib/ai/openai-compatible";
 import { extractJson } from "@/lib/ai/schema";
 import { config } from "@/lib/config";
@@ -292,14 +292,22 @@ describe("Gemini (free tier)", () => {
   });
 
   it("still writes the post when the free search quota is used up", async () => {
-    fakeFetch((_c, i) =>
-      i === 0
+    fakeFetch((c) =>
+      String(c.body).includes("google_search")
         ? json({ error: { code: 429, message: "Quota exceeded" } }, { status: 429 })
         : json({ candidates: [{ content: { parts: [{ text: JSON.stringify(modelJson) }] } }] }),
     );
     const out = await generateWithGemini("key-1", "gemini-2.5-flash", aiReq);
     expect(out.caption).toBe("Caption text");
     expect(out.liveChecked).toBe(false);
+    expect(out.notice).toMatch(/isn't included in your free Gemini plan/);
+
+    // The next request skips the search instead of failing on it again.
+    calls.length = 0;
+    const again = await generateWithGemini("key-1", "gemini-2.5-flash", aiReq);
+    expect(calls).toHaveLength(1);
+    expect(again.notice).toMatch(/free Gemini plan/);
+    resetGeminiSearchPause();
   });
 });
 

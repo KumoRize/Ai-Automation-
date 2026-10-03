@@ -132,14 +132,29 @@ export async function generateWithGemini(
   }
 }
 
+// Google Search isn't part of every free plan. After a quota error, skip it for a while instead of
+// spending a request (and a few seconds) on it every time.
+const SEARCH_PAUSE_MS = 6 * 60 * 60 * 1000;
+let searchPausedUntil = 0;
+
+const SEARCH_UNAVAILABLE =
+  "Live trend search isn't included in your free Gemini plan right now, so hashtags are based on the AI's own knowledge.";
+
 async function write(apiKey: string, model: string, req: GenerateRequest): Promise<GeneratedContent> {
   let trends = { notes: "", sources: [] as { url: string; title: string }[] };
-  if (req.liveTrends) {
+  let notice: string | undefined;
+  if (req.liveTrends && Date.now() < searchPausedUntil) {
+    notice = SEARCH_UNAVAILABLE;
+  } else if (req.liveTrends) {
     try {
       trends = await research(apiKey, model, req);
     } catch (err) {
       if (isRetiredModel(err)) throw err;
-      // Search quota can run out on the free tier; still write the post without it.
+      if (err instanceof PlatformError && err.status === 429) {
+        searchPausedUntil = Date.now() + SEARCH_PAUSE_MS;
+        notice = SEARCH_UNAVAILABLE;
+      }
+      // Still write the post without the search.
       console.warn("[ai] Gemini trend search failed, continuing without it:", err);
     }
   }
@@ -153,9 +168,15 @@ async function write(apiKey: string, model: string, req: GenerateRequest): Promi
       responseSchema: RESPONSE_SCHEMA,
     },
   });
-  return finalize(extractJson(textOf(res)), {
+  const out = finalize(extractJson(textOf(res)), {
     sources: trends.sources,
     provider: `Google Gemini (${model})`,
     liveChecked: Boolean(trends.notes),
   });
+  return notice ? { ...out, notice } : out;
+}
+
+/** For tests: forget a paused search. */
+export function resetGeminiSearchPause(): void {
+  searchPausedUntil = 0;
 }
