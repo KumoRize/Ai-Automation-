@@ -148,6 +148,11 @@ export const x: PlatformAdapter = {
     return { externalId: res.data.id, url: `https://x.com/${handle}/status/${res.data.id}` };
   },
 
+  async verify(creds) {
+    const me = await requestJson<{ data: { username: string } }>(`${API}/users/me`, { headers: bearer(creds) });
+    return `@${me.data.username}`;
+  },
+
   async replyToComment(creds, comment, text) {
     await requestJson(`${API}/tweets`, {
       method: "POST",

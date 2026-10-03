@@ -112,6 +112,13 @@ export const facebook: PlatformAdapter = {
     return { externalId: res.id, url: `https://www.facebook.com/${res.id}` };
   },
 
+  async verify(creds) {
+    const page = await requestJson<{ name: string }>(
+      `${GRAPH()}/${creds.externalId}?fields=name&access_token=${encodeURIComponent(creds.accessToken)}`,
+    );
+    return page.name;
+  },
+
   async replyToComment(creds, comment, text) {
     await requestJson(`${GRAPH()}/${comment.commentId}/comments`, {
       method: "POST",

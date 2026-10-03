@@ -15,7 +15,7 @@ export const config = {
   disableInternalScheduler: env("DISABLE_INTERNAL_SCHEDULER") === "1",
   pollIntervalMinutes: Number(env("POLL_INTERVAL_MINUTES") ?? "5"),
 
-  graphVersion: env("META_GRAPH_VERSION") ?? "v23.0",
+  graphVersion: env("META_GRAPH_VERSION") ?? "v25.0",
   metaWebhookVerifyToken: env("META_WEBHOOK_VERIFY_TOKEN"),
 
   instagram: {
@@ -59,6 +59,9 @@ export const config = {
     customBaseUrl: env("AI_BASE_URL")?.replace(/\/+$/, ""),
     customKey: env("AI_API_KEY"),
     customModel: env("AI_MODEL"),
+    /** Anthropic Claude (paid, pay-as-you-go): best quality, also checks live trends with web search. */
+    anthropicKey: env("ANTHROPIC_API_KEY"),
+    anthropicModel: env("ANTHROPIC_MODEL") ?? "claude-opus-5-5",
   },
 };
 

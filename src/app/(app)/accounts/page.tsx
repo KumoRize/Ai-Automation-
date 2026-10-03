@@ -3,6 +3,7 @@ import { listAccounts } from "@/lib/accounts";
 import { adapters } from "@/lib/platforms";
 import { PLATFORMS, PLATFORM_LABELS } from "@/lib/types";
 import { ActionButton } from "@/components/ActionButton";
+import { TestButton } from "@/components/TestButton";
 import { Notice, PlatformBadge } from "@/components/ui";
 
 export default async function AccountsPage({ searchParams }: PageProps<"/accounts">) {
@@ -45,19 +46,22 @@ export default async function AccountsPage({ searchParams }: PageProps<"/account
               {connected.length > 0 ? (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {connected.map((acc) => (
-                    <li key={acc.id} className="flex items-center justify-between py-2">
+                    <li key={acc.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span>
                         {acc.username}
                         {acc.demo ? <span className="ml-2 rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700">demo</span> : null}
                       </span>
-                      <ActionButton
-                        url={`/api/accounts/${acc.id}`}
-                        method="DELETE"
-                        confirm={`Disconnect ${acc.username}? Its posts and automations stay, but nothing more is sent from it.`}
-                        className="btn btn-sm btn-danger"
-                      >
-                        Disconnect
-                      </ActionButton>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <TestButton url={`/api/accounts/${acc.id}/check`} />
+                        <ActionButton
+                          url={`/api/accounts/${acc.id}`}
+                          method="DELETE"
+                          confirm={`Disconnect ${acc.username}? Its posts and automations stay, but nothing more is sent from it.`}
+                          className="btn btn-sm btn-danger"
+                        >
+                          Disconnect
+                        </ActionButton>
+                      </span>
                     </li>
                   ))}
                 </ul>

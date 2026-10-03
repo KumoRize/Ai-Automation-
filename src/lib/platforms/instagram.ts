@@ -120,9 +120,9 @@ export const instagram: PlatformAdapter = {
       form.video_url = mediaPublicUrl(post.media_file);
       form.share_to_feed = "true";
     }
-    const container = await requestJson<{ id: string }>(`${GRAPH()}/me/media`, { method: "POST", form });
+    const container = await requestJson<{ id: string }>(`${GRAPH()}/${creds.externalId}/media`, { method: "POST", form });
     await waitForContainer(container.id, creds.accessToken);
-    const published = await requestJson<{ id: string }>(`${GRAPH()}/me/media_publish`, {
+    const published = await requestJson<{ id: string }>(`${GRAPH()}/${creds.externalId}/media_publish`, {
       method: "POST",
       form: { creation_id: container.id, access_token: creds.accessToken },
     });
@@ -138,6 +138,13 @@ export const instagram: PlatformAdapter = {
     return { externalId: published.id, url };
   },
 
+  async verify(creds) {
+    const me = await requestJson<{ username: string }>(
+      `${GRAPH()}/me?fields=user_id,username&access_token=${encodeURIComponent(creds.accessToken)}`,
+    );
+    return `@${me.username}`;
+  },
+
   async replyToComment(creds, comment, text) {
     await requestJson(`${GRAPH()}/${comment.commentId}/replies`, {
       method: "POST",
@@ -147,7 +154,7 @@ export const instagram: PlatformAdapter = {
 
   async sendPrivateReply(creds, comment, text) {
     // A "private reply" is a DM tied to the comment. Instagram allows one per comment, within 7 days.
-    await requestJson(`${GRAPH()}/me/messages?access_token=${encodeURIComponent(creds.accessToken)}`, {
+    await requestJson(`${GRAPH()}/${creds.externalId}/messages?access_token=${encodeURIComponent(creds.accessToken)}`, {
       method: "POST",
       json: { recipient: { comment_id: comment.commentId }, message: { text } },
     });

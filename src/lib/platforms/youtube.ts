@@ -158,6 +158,16 @@ export const youtube: PlatformAdapter = {
     return { externalId: body.id, url: `https://www.youtube.com/watch?v=${body.id}` };
   },
 
+  async verify(creds) {
+    const res = await requestJson<{ items?: { snippet: { title: string } }[] }>(
+      `${API}/channels?part=snippet&mine=true`,
+      { headers: bearer(creds) },
+    );
+    const title = res.items?.[0]?.snippet.title;
+    if (!title) throw new PlatformError("This Google account has no YouTube channel.");
+    return title;
+  },
+
   async replyToComment(creds, comment, text) {
     await requestJson(`${API}/comments?part=snippet`, {
       method: "POST",

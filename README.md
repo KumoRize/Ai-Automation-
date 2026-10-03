@@ -49,15 +49,16 @@ The AI generator works right away in **Basic mode** (templates, no key). For rea
 
 ## Free AI setup
 
-Pick one and add it to `.env.local`, then restart. All three cost nothing.
+Add one or more keys to `.env.local`, then restart. The first three cost nothing. If you set several, the app tries the free ones first and moves to the next automatically when one fails or hits its limit. You can also pick one with `AI_PROVIDER`.
 
 | Option | How to get it | What you get |
 |---|---|---|
 | **Google Gemini** (recommended) | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No card needed. Set `GEMINI_API_KEY`. | Good captions, plus **live trend checks with Google Search** on the free daily allowance of `gemini-2.5-flash` |
 | **Groq** | Create a key at [console.groq.com/keys](https://console.groq.com/keys). Set `GROQ_API_KEY`. | Very fast Llama 3.3 70B. No live trend search |
 | **Ollama** | Install [ollama.com](https://ollama.com), run `ollama pull llama3.1`, set `OLLAMA_MODEL=llama3.1` | Runs on your own computer: private, no limits, no internet needed |
+| **Anthropic Claude** (paid, optional) | Create a key at [console.anthropic.com](https://console.anthropic.com). Set `ANTHROPIC_API_KEY` | The strongest writing, plus live trend checks with web search. Billed per use |
 
-Free tiers have rate limits that Google and Groq can change at any time; check your current limits in their dashboards. If the AI service fails or the free limit runs out, the app shows Basic mode results with a note explaining why, so you're never left with nothing. Any other OpenAI-compatible service (OpenRouter, LM Studio) works too, through `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL`.
+After adding a key, open **Setup** and click **Test AI**. It runs one real request and tells you which AI answered, or exactly what went wrong. Free tiers have rate limits that Google and Groq can change at any time; check your current limits in their dashboards. If the AI service fails or the free limit runs out, the app shows Basic mode results with a note explaining why, so you're never left with nothing. Any other OpenAI-compatible service (OpenRouter, LM Studio) works too, through `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL`.
 
 ## Connecting real accounts
 
@@ -74,7 +75,7 @@ Each platform needs a free developer app. The **Setup** page in the app lists th
 | YouTube | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | Enable YouTube Data API v3. Create an OAuth client of type Web application | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | X | [X Developer Console](https://developer.x.com/en/portal/dashboard) | User authentication: OAuth 2.0, type Web App, read + write + DM | `X_CLIENT_ID`, `X_CLIENT_SECRET` |
 
-Restart the app after changing env vars, then use **Connect** on the Accounts page. Open the app at the same address as `APP_URL` when you connect, because the login comes back to that address and needs your session there.
+Restart the app after changing env vars, then use **Connect** on the Accounts page. After connecting, click **Test** next to the account. It makes a safe read-only request and shows the account name, or the platform's exact error. Open the app at the same address as `APP_URL` when you connect, because the login comes back to that address and needs your session there.
 
 ### Platform approvals you should know about
 
@@ -120,7 +121,7 @@ src/
   lib/platforms/      One adapter per platform (OAuth, publish, reply, DM, comment polling)
   lib/publisher.ts    Publishing to all selected accounts, with retries and status
   lib/automation.ts   Keyword matching and comment → reply/DM handling
-  lib/ai/             Free AI generator: Gemini, Groq/Ollama/OpenAI-compatible, and offline Basic mode
+  lib/ai/             AI generator: Gemini (free), Groq/Ollama/OpenAI-compatible (free), Claude, automatic failover, Basic mode
   lib/scheduler.ts    Scheduled posts and YouTube/X comment polling
 tests/                Unit tests (npm test)
 ```
@@ -137,10 +138,11 @@ npm run typecheck   # TypeScript
 
 Built and checked so far:
 
-- 50 unit tests. They cover caption limits (including Instagram's 5 hashtags), keyword matching in any language and with emoji, webhook parsing and signatures, encryption and sessions. Fake-API tests check the exact requests each platform integration and AI provider sends: Instagram, Facebook, TikTok, YouTube, X, Gemini, and Groq/Ollama.
-- End to end with demo accounts: login, publishing, scheduling, webhook-triggered DMs, duplicate-comment protection, the cron endpoint, and the AI generator in Basic mode.
+- 56 automated tests pass. They cover caption limits (including Instagram's 5 hashtags), keyword matching in any language and with emoji, webhook signatures, encryption and sessions. Fake-API tests check the exact requests each platform (Instagram, Facebook, TikTok, YouTube, X) and each AI service (Gemini, Groq/Ollama, Claude) sends, and how the app handles their answers and errors, including failover from one AI to the next.
+- End to end with demo accounts: login, publishing, scheduling, webhook-triggered DMs, duplicate-comment protection, the cron endpoint, and both Test buttons.
+- Google's real Gemini service was called with a wrong key: the app recognized the rejection, reported it clearly, and used Basic mode.
 
-Not yet checked: the real platform APIs and the free AI services have never been called with real keys, because that needs your developer apps and keys. If a platform returns an error, it appears on the **Posts** page next to that account. If the AI fails, the generator shows why and falls back to Basic mode.
+What can only be confirmed with your own keys and accounts: a real AI answer, and real posting, replies and DMs on each platform. The **Test AI** and per-account **Test** buttons check this in one click. If a platform rejects a post, the reason appears on the **Posts** page.
 
 ## Roadmap ideas
 

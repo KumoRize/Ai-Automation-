@@ -15,8 +15,8 @@ export default async function GeneratorPage() {
           Describe your post and get trending hashtags, search keywords and a caption in your style.
         </p>
       </div>
-      {ai.problem && <Notice tone="error">{ai.problem} Using Basic mode until it&apos;s fixed.</Notice>}
-      {ai.provider === "basic" && !ai.problem && (
+      {ai.problem && <Notice tone="error">{ai.problem}</Notice>}
+      {ai.chain.length === 0 && !ai.problem && (
         <Notice tone="info">
           You&apos;re in Basic mode, which works without any key but only uses templates. For real AI captions and
           live trending hashtags, add a free Google Gemini key. See <Link href="/setup" className="underline">Setup</Link>.

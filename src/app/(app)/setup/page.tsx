@@ -3,6 +3,7 @@ import { aiStatus } from "@/lib/ai";
 import { callbackUrl, config } from "@/lib/config";
 import { adapters } from "@/lib/platforms";
 import { PLATFORMS, type Platform } from "@/lib/types";
+import { TestButton } from "@/components/TestButton";
 import { Notice, PlatformBadge } from "@/components/ui";
 
 const PORTALS: Record<Platform, { name: string; url: string }> = {
@@ -46,10 +47,13 @@ export default async function SetupPage() {
       <div className="card space-y-2 text-sm">
         <p className="font-medium">General</p>
         <p>
-          <Check ok={ai.provider !== "basic"} /> AI generator: <strong>{ai.label}</strong>
+          <Check ok={ai.chain.length > 0} /> AI generator: <strong>{ai.label}</strong>
           {ai.problem && <span className="text-red-600"> ({ai.problem})</span>}
         </p>
-        {ai.provider === "basic" && (
+        <div className="pl-5">
+          <TestButton url="/api/ai/test" label="Test AI" />
+        </div>
+        {ai.chain.length === 0 && (
           <p className="pl-5 text-slate-600">
             Free upgrade: get a Google Gemini key at{" "}
             <a className="text-brand-600 underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>{" "}

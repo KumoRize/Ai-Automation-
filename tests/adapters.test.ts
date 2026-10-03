@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { aiStatus, generateContent } from "@/lib/ai";
 import { generateBasic } from "@/lib/ai/basic";
+import { generateWithClaude } from "@/lib/ai/claude";
 import { generateWithGemini } from "@/lib/ai/gemini";
 import { generateWithOpenAICompatible } from "@/lib/ai/openai-compatible";
 import { extractJson } from "@/lib/ai/schema";
+import { config } from "@/lib/config";
 import { uploadsDir } from "@/lib/media";
 import { facebook } from "@/lib/platforms/facebook";
 import { instagram } from "@/lib/platforms/instagram";
@@ -95,9 +98,9 @@ const video = { media_file: "test-video.mp4", media_type: "video" as const, medi
 describe("Instagram", () => {
   it("creates a container, waits for it, publishes, and reads the permalink", async () => {
     fakeFetch((c) => {
-      if (c.url.endsWith("/me/media")) return json({ id: "container-1" });
+      if (c.url.endsWith("/acct-1/media")) return json({ id: "container-1" });
       if (c.url.includes("/container-1?")) return json({ status_code: "FINISHED" });
-      if (c.url.endsWith("/me/media_publish")) return json({ id: "media-9" });
+      if (c.url.endsWith("/acct-1/media_publish")) return json({ id: "media-9" });
       if (c.url.includes("/media-9?")) return json({ permalink: "https://instagram.com/p/abc" });
       return json({}, { status: 404 });
     });
@@ -111,9 +114,9 @@ describe("Instagram", () => {
 
   it("posts videos as Reels", async () => {
     fakeFetch((c) => {
-      if (c.url.endsWith("/me/media")) return json({ id: "c2" });
+      if (c.url.endsWith("/acct-1/media")) return json({ id: "c2" });
       if (c.url.includes("/c2?")) return json({ status_code: "FINISHED" });
-      if (c.url.endsWith("/me/media_publish")) return json({ id: "m2" });
+      if (c.url.endsWith("/acct-1/media_publish")) return json({ id: "m2" });
       return json({});
     });
     await instagram.publish(creds, { post: post(video), text: "v" });
@@ -351,5 +354,91 @@ describe("extractJson", () => {
   it("finds JSON inside surrounding text", () => {
     expect(extractJson('Here you go: {"a": 1} hope it helps')).toEqual({ a: 1 });
     expect(() => extractJson("no json here")).toThrow();
+  });
+});
+
+describe("Claude", () => {
+  const claudeMessage = (text: string) =>
+    json({
+      id: "msg_1",
+      type: "message",
+      role: "assistant",
+      model: "claude-opus-5-5",
+      content: [{ type: "text", text }],
+      stop_reason: "end_turn",
+      stop_sequence: null,
+      usage: { input_tokens: 10, output_tokens: 10 },
+    });
+
+  it("asks for structured output with refusal fallbacks and parses it", async () => {
+    fakeFetch(() => claudeMessage(JSON.stringify(modelJson)));
+    const out = await generateWithClaude("sk-test", "claude-opus-5-5", { ...aiReq, liveTrends: false });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain("api.anthropic.com/v1/messages");
+    expect(calls[0].headers.get("x-api-key")).toBe("sk-test");
+    expect(calls[0].headers.get("anthropic-beta")).toContain("server-side-fallback-2026-07-01");
+    const body = JSON.parse(calls[0].body as string);
+    expect(body.model).toBe("claude-opus-5-5");
+    expect(body.fallbacks).toBe("default");
+    expect(body.output_config.format.type).toBe("json_schema");
+    expect(out.caption).toBe("Caption text");
+    expect(out.provider).toBe("Anthropic Claude (claude-opus-5-5)");
+  });
+});
+
+describe("AI failover", () => {
+  const saved = { ...config.ai };
+  afterEach(() => Object.assign(config.ai, saved));
+
+  it("lists configured providers free-first and falls back to the next one", async () => {
+    Object.assign(config.ai, { provider: "auto", geminiKey: "g", anthropicKey: "a", groqKey: undefined });
+    expect(aiStatus().chain).toEqual(["gemini", "claude"]);
+    fakeFetch((c) =>
+      c.url.includes("generativelanguage")
+        ? json({ error: { code: 429, message: "Resource exhausted" } }, { status: 429 })
+        : json({
+            id: "m", type: "message", role: "assistant", model: "claude-opus-5-5",
+            content: [{ type: "text", text: JSON.stringify(modelJson) }],
+            stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+    );
+    const out = await generateContent({ ...aiReq, liveTrends: false });
+    expect(out.provider).toMatch(/Claude/);
+    expect(out.notice).toMatch(/Gemini.*limit/);
+  });
+
+  it("uses Basic mode with an explanation when every provider fails", async () => {
+    Object.assign(config.ai, { provider: "auto", geminiKey: "bad", anthropicKey: undefined, groqKey: undefined });
+    fakeFetch(() => json({ error: { code: 400, message: "API key not valid." } }, { status: 400 }));
+    const out = await generateContent({ ...aiReq, liveTrends: false });
+    expect(out.provider).toMatch(/Basic/);
+    expect(out.notice).toMatch(/key was rejected/);
+  });
+
+  it("puts the provider named in AI_PROVIDER first and reports bad names", () => {
+    Object.assign(config.ai, { provider: "claude", geminiKey: "g", anthropicKey: "a" });
+    expect(aiStatus().chain).toEqual(["claude", "gemini"]);
+    Object.assign(config.ai, { provider: "chatgpt" });
+    expect(aiStatus().problem).toMatch(/Unknown AI_PROVIDER/);
+    Object.assign(config.ai, { provider: "basic" });
+    expect(aiStatus().chain).toEqual([]);
+  });
+});
+
+describe("connection checks", () => {
+  it("each platform reads the account name with the saved token", async () => {
+    fakeFetch((c) => {
+      if (c.url.includes("graph.instagram.com")) return json({ username: "creator" });
+      if (c.url.includes("graph.facebook.com")) return json({ name: "My Page" });
+      if (c.url.includes("open.tiktokapis.com")) return json({ data: { user: { display_name: "Tik Name" } }, error: { code: "ok" } });
+      if (c.url.includes("googleapis.com/youtube")) return json({ items: [{ snippet: { title: "My Channel" } }] });
+      if (c.url.includes("api.x.com")) return json({ data: { username: "creator" } });
+      return json({}, { status: 404 });
+    });
+    expect(await instagram.verify(creds)).toBe("@creator");
+    expect(await facebook.verify(creds)).toBe("My Page");
+    expect(await tiktok.verify(creds)).toBe("Tik Name");
+    expect(await youtube.verify(creds)).toBe("My Channel");
+    expect(await x.verify(creds)).toBe("@creator");
   });
 });

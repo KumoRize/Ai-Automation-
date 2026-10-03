@@ -131,6 +131,14 @@ export const tiktok: PlatformAdapter = {
     };
   },
 
+  async verify(creds) {
+    const user = await requestJson<{ data: { user: { display_name: string } } }>(
+      `${API}/user/info/?fields=open_id,display_name`,
+      { headers: bearer(creds) },
+    );
+    return user.data.user.display_name;
+  },
+
   async publish(creds, { post, text }) {
     if (post.media_type === "none" || !post.media_file)
       throw new PlatformError("TikTok needs a video or an image.");

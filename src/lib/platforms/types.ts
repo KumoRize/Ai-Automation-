@@ -69,6 +69,8 @@ export interface PlatformAdapter {
   /** Called right after connect, e.g. to subscribe to comment webhooks. */
   afterConnect?(creds: AccountCredentials): Promise<void>;
   publish(creds: AccountCredentials, input: PublishInput): Promise<PublishResult>;
+  /** Cheap read-only call that proves the saved login still works. Returns the account's name. */
+  verify(creds: AccountCredentials): Promise<string>;
   replyToComment?(creds: AccountCredentials, comment: IncomingComment, text: string): Promise<void>;
   sendPrivateReply?(creds: AccountCredentials, comment: IncomingComment, text: string): Promise<void>;
   pollComments?(creds: AccountCredentials, postExternalId: string, cursor: string | null): Promise<PollResult>;
