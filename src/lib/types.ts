@@ -46,7 +46,9 @@ export interface PostRow {
 export interface PostTargetRow {
   id: string;
   post_id: string;
-  account_id: string;
+  /** Null once the account is disconnected; account_name keeps the history readable. */
+  account_id: string | null;
+  account_name: string;
   platform: Platform;
   status: "pending" | "publishing" | "published" | "failed";
   external_id: string | null;

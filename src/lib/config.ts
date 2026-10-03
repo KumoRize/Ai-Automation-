@@ -25,6 +25,8 @@ export const config = {
   facebook: {
     appId: env("META_APP_ID"),
     appSecret: env("META_APP_SECRET"),
+    /** Facebook Login for Business configuration ID. When set, it replaces the scope list. */
+    loginConfigId: env("META_LOGIN_CONFIG_ID"),
   },
   tiktok: {
     clientKey: env("TIKTOK_CLIENT_KEY"),
@@ -44,7 +46,20 @@ export const config = {
     pollReplies: env("X_POLL_REPLIES") === "1",
   },
 
-  anthropicModel: env("ANTHROPIC_MODEL") ?? "claude-opus-5-5",
+  ai: {
+    /** auto | gemini | groq | ollama | custom | basic. "auto" picks the first one that has a key. */
+    provider: (env("AI_PROVIDER") ?? "auto").toLowerCase(),
+    geminiKey: env("GEMINI_API_KEY"),
+    geminiModel: env("GEMINI_MODEL") ?? "gemini-2.5-flash",
+    groqKey: env("GROQ_API_KEY"),
+    groqModel: env("GROQ_MODEL") ?? "llama-3.3-70b-versatile",
+    ollamaUrl: (env("OLLAMA_URL") ?? "http://localhost:11434").replace(/\/+$/, ""),
+    ollamaModel: env("OLLAMA_MODEL"),
+    /** Any OpenAI-compatible endpoint, e.g. OpenRouter or LM Studio. */
+    customBaseUrl: env("AI_BASE_URL")?.replace(/\/+$/, ""),
+    customKey: env("AI_API_KEY"),
+    customModel: env("AI_MODEL"),
+  },
 };
 
 export function callbackUrl(platform: string): string {

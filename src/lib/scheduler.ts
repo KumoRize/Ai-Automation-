@@ -1,4 +1,4 @@
-import { credentialsFor, getAccount } from "./accounts";
+import { credentialsFor, getAccount, refreshExpiringTokens } from "./accounts";
 import { activeAutomations, handleComment } from "./automation";
 import { config } from "./config";
 import { all, run } from "./db";
@@ -37,7 +37,7 @@ export async function pollComments(): Promise<number> {
       ? JSON.parse(target.poll_cursor)
       : { cursor: null, lastPolledAt: 0 };
     if (Date.now() - state.lastPolledAt < config.pollIntervalMinutes * 60 * 1000) continue;
-    const account = getAccount(target.account_id);
+    const account = target.account_id ? getAccount(target.account_id) : undefined;
     const poll = adapter(target.platform).pollComments;
     if (!account || !poll || !target.external_id) continue;
     try {
@@ -58,13 +58,19 @@ export async function pollComments(): Promise<number> {
 }
 
 let running = false;
+let lastTokenCheck = 0;
 
-export async function tick(): Promise<{ published: number; comments: number }> {
+/** One scheduler round. `wait` makes it finish uploads before returning (needed by /api/cron on serverless hosts). */
+export async function tick({ wait = false }: { wait?: boolean } = {}): Promise<{ published: number; comments: number }> {
   if (running) return { published: 0, comments: 0 };
   running = true;
   try {
-    const published = await publishDuePosts();
+    const published = await publishDuePosts({ wait });
     const comments = await pollComments();
+    if (Date.now() - lastTokenCheck > 6 * 60 * 60 * 1000) {
+      lastTokenCheck = Date.now();
+      await refreshExpiringTokens();
+    }
     return { published, comments };
   } finally {
     running = false;
@@ -73,8 +79,11 @@ export async function tick(): Promise<{ published: number; comments: number }> {
 
 /** Marks uploads that were cut off by a restart as failed, so they can be retried. */
 export function recoverInterrupted(): void {
+  // Targets still pending on a post that was mid-publish never started; treat them the same way.
   run(
-    "UPDATE post_targets SET status = 'failed', error = 'Interrupted by a server restart. Click Retry.' WHERE status = 'publishing'",
+    `UPDATE post_targets SET status = 'failed', error = 'Interrupted by a server restart. Click Retry.'
+     WHERE status = 'publishing'
+        OR (status = 'pending' AND post_id IN (SELECT id FROM posts WHERE status = 'publishing'))`,
   );
   run(
     `UPDATE posts SET status = CASE

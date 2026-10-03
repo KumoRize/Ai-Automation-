@@ -13,7 +13,7 @@ async function handle(request: Request) {
   if (!config.cronSecret || !safeEqual(auth, `Bearer ${config.cronSecret}`)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return Response.json(await tick());
+  return Response.json(await tick({ wait: true }));
 }
 
 export const GET = handle;

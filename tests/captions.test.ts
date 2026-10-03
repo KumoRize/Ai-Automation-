@@ -41,9 +41,15 @@ describe("per-platform captions", () => {
     expect(captionFor("facebook", { ...base, caption: "New drop", link: "https://a.co", linkInCaption: false })).toBe("New drop");
   });
 
-  it("caps Instagram at 30 hashtags", () => {
-    const tags = Array.from({ length: 35 }, (_, i) => `#tag${i}`).join(" ");
-    expect(extractHashtags(captionFor("instagram", { ...base, caption: `Hello ${tags}` }))).toHaveLength(30);
+  it("keeps only the first 5 hashtags on Instagram (its limit since Dec 2025)", () => {
+    const tags = Array.from({ length: 12 }, (_, i) => `#tag${i}`).join(" ");
+    const text = captionFor("instagram", { ...base, caption: `Hello ${tags}` });
+    expect(extractHashtags(text)).toEqual(["#tag0", "#tag1", "#tag2", "#tag3", "#tag4"]);
+    expect(extractHashtags(captionFor("facebook", { ...base, caption: tags }))).toHaveLength(12);
+  });
+
+  it("keeps hashtags in scripts with combining marks whole", () => {
+    expect(extractHashtags("#बिरयानी #بریانی")).toEqual(["#बिरयानी", "#بریانی"]);
   });
 
   it("strips angle brackets YouTube rejects", () => {

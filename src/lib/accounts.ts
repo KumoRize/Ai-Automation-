@@ -65,31 +65,73 @@ export function deleteAccount(id: string): void {
   run("DELETE FROM accounts WHERE id = ?", id);
 }
 
-const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+/** How long before expiry a token is renewed. Instagram tokens last 60 days and can only be renewed while valid. */
+function refreshMargin(platform: Platform): number {
+  return platform === "instagram" ? 7 * 24 * 60 * 60 * 1000 : 5 * 60 * 1000;
+}
 
-/** Decrypts an account's tokens, refreshing them first if they're about to expire. */
-export async function credentialsFor(account: AccountRow): Promise<AccountCredentials> {
-  let creds: AccountCredentials = {
-    externalId: account.external_id,
-    username: account.username,
-    accessToken: account.access_token ? decrypt(account.access_token) : "",
-    refreshToken: account.refresh_token ? decrypt(account.refresh_token) : null,
-    meta: JSON.parse(account.meta) as Record<string, unknown>,
-  };
-  const expiring = account.expires_at !== null && account.expires_at - Date.now() < REFRESH_MARGIN_MS;
-  const refresh = adapter(account.platform).refresh;
-  if (!account.demo && expiring && refresh) {
-    const fresh = await refresh(creds);
+export function needsRefresh(account: Pick<AccountRow, "platform" | "expires_at" | "demo">, now = Date.now()): boolean {
+  return (
+    !account.demo &&
+    account.expires_at !== null &&
+    account.expires_at - now < refreshMargin(account.platform) &&
+    Boolean(adapter(account.platform).refresh)
+  );
+}
+
+// One refresh per account at a time: X and TikTok refresh tokens are single-use,
+// so two parallel refreshes would make the second one fail.
+const refreshing = new Map<string, Promise<void>>();
+
+async function refreshAccount(account: AccountRow): Promise<void> {
+  const running = refreshing.get(account.id);
+  if (running) return running;
+  const task = (async () => {
+    const current = getAccount(account.id);
+    if (!current || !needsRefresh(current)) return; // someone else already refreshed it
+    const fresh = await adapter(current.platform).refresh!({
+      externalId: current.external_id,
+      username: current.username,
+      accessToken: current.access_token ? decrypt(current.access_token) : "",
+      refreshToken: current.refresh_token ? decrypt(current.refresh_token) : null,
+      meta: JSON.parse(current.meta) as Record<string, unknown>,
+    });
     run(
       "UPDATE accounts SET access_token = ?, refresh_token = COALESCE(?, refresh_token), expires_at = ? WHERE id = ?",
       encrypt(fresh.accessToken),
       fresh.refreshToken ? encrypt(fresh.refreshToken) : null,
       fresh.expiresAt ?? null,
-      account.id,
+      current.id,
     );
-    creds = { ...creds, accessToken: fresh.accessToken, refreshToken: fresh.refreshToken ?? creds.refreshToken };
+  })().finally(() => refreshing.delete(account.id));
+  refreshing.set(account.id, task);
+  return task;
+}
+
+/** Decrypts an account's tokens, refreshing them first if they're about to expire. */
+export async function credentialsFor(account: AccountRow): Promise<AccountCredentials> {
+  if (needsRefresh(account)) await refreshAccount(account);
+  const current = getAccount(account.id) ?? account;
+  return {
+    externalId: current.external_id,
+    username: current.username,
+    accessToken: current.access_token ? decrypt(current.access_token) : "",
+    refreshToken: current.refresh_token ? decrypt(current.refresh_token) : null,
+    meta: JSON.parse(current.meta) as Record<string, unknown>,
+  };
+}
+
+/** Renews tokens that will expire soon, so accounts stay connected even when unused. */
+export async function refreshExpiringTokens(): Promise<void> {
+  for (const account of all<AccountRow>("SELECT * FROM accounts WHERE demo = 0 AND expires_at IS NOT NULL")) {
+    // Short-lived tokens (X, TikTok, YouTube) are renewed on use; only long-lived Instagram tokens need this.
+    if (account.platform !== "instagram" || !needsRefresh(account)) continue;
+    try {
+      await refreshAccount(account);
+    } catch (err) {
+      console.error(`[tokens] could not renew ${account.platform} ${account.username}:`, err);
+    }
   }
-  return creds;
 }
 
 const STATE_TTL_MS = 15 * 60 * 1000;

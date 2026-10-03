@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { listAccounts } from "@/lib/accounts";
-import { aiConfigured } from "@/lib/ai";
+import { aiStatus } from "@/lib/ai";
 import { ACCEPT_ATTR, MAX_UPLOAD_BYTES } from "@/lib/media";
 import { adapters } from "@/lib/platforms";
 import { PLATFORMS, type Platform } from "@/lib/types";
@@ -34,7 +34,7 @@ export default async function ComposePage() {
           support={support}
           accept={ACCEPT_ATTR}
           maxUploadMb={Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}
-          aiEnabled={aiConfigured()}
+          ai={{ label: aiStatus().label, liveTrends: aiStatus().liveTrends }}
         />
       )}
     </div>

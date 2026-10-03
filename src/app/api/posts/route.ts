@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     const scheduledRaw = text("scheduledAt");
     const scheduledAt = scheduledRaw ? Date.parse(scheduledRaw) : null;
     if (scheduledAt !== null && Number.isNaN(scheduledAt)) throw new Error("The schedule time is not valid.");
+    if (scheduledAt !== null && scheduledAt < Date.now() - 60_000)
+      throw new Error("The schedule time is in the past. Pick a future time or choose Post now.");
 
     const file = form.get("file");
     if (file instanceof File && file.size > 0) media = await saveUpload(file);

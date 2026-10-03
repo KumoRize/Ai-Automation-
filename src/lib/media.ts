@@ -14,7 +14,7 @@ const ALLOWED: Record<string, { ext: string; type: MediaType }> = {
   "video/quicktime": { ext: "mov", type: "video" },
 };
 
-export const ACCEPT_ATTR = Object.keys(ALLOWED).join(",");
+export const ACCEPT_ATTR = [...Object.keys(ALLOWED), ".jpg", ".jpeg", ".png", ".mp4", ".mov"].join(",");
 
 export function uploadsDir(): string {
   const dir = path.join(config.dataDir, "uploads");
@@ -29,15 +29,25 @@ export interface SavedMedia {
   size: number;
 }
 
+const BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+};
+
 export async function saveUpload(file: File): Promise<SavedMedia> {
-  const kind = ALLOWED[file.type];
-  if (!kind) throw new Error(`Unsupported file type "${file.type || "unknown"}". Use JPEG, PNG, MP4 or MOV.`);
+  // Some phones send no MIME type, so fall back to the file extension.
+  const mime = file.type || BY_EXTENSION[file.name.split(".").pop()?.toLowerCase() ?? ""] || "";
+  const kind = ALLOWED[mime];
+  if (!kind) throw new Error(`Unsupported file type "${mime || file.name}". Use JPEG, PNG, MP4 or MOV.`);
   if (file.size > MAX_UPLOAD_BYTES)
     throw new Error(`File is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`);
   const name = `${randomId(18)}.${kind.ext}`;
   const target = path.join(uploadsDir(), name);
   await fs.promises.writeFile(target, Readable.fromWeb(file.stream() as never));
-  return { file: name, type: kind.type, mime: file.type, size: file.size };
+  return { file: name, type: kind.type, mime, size: file.size };
 }
 
 /** Only bare generated names are valid, which blocks path traversal. */

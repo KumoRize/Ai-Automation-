@@ -10,6 +10,9 @@ interface Result {
   keywords: string[];
   styleNotes: string;
   sources: { title: string; url: string }[];
+  provider: string;
+  liveChecked: boolean;
+  notice?: string;
 }
 
 const STYLES = ["Witty", "Luxury", "Gen Z", "Professional", "Storytelling", "Minimal", "Motivational"];
@@ -33,10 +36,16 @@ function CopyButton({ text }: { text: string }) {
 
 export function GeneratorPanel({
   initialTopic = "",
+  providerLabel,
+  canCheckTrends,
   onUseCaption,
   onUseTitle,
 }: {
   initialTopic?: string;
+  /** Name of the AI engine in use, e.g. "Google Gemini (free tier)". */
+  providerLabel: string;
+  /** Whether the engine can search the web for live trends. */
+  canCheckTrends: boolean;
   /** When set (inside the composer), results get "Use" buttons instead of only "Copy". */
   onUseCaption?: (text: string) => void;
   onUseTitle?: (title: string) => void;
@@ -44,7 +53,7 @@ export function GeneratorPanel({
   const [topic, setTopic] = useState(initialTopic);
   const [style, setStyle] = useState("");
   const [language, setLanguage] = useState("English");
-  const [liveTrends, setLiveTrends] = useState(true);
+  const [liveTrends, setLiveTrends] = useState(canCheckTrends);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -57,7 +66,7 @@ export function GeneratorPanel({
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, style, language, liveTrends }),
+        body: JSON.stringify({ topic, style, language, liveTrends: canCheckTrends && liveTrends }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Generation failed.");
@@ -112,18 +121,24 @@ export function GeneratorPanel({
           <label className="label" htmlFor="gen-lang">Language</label>
           <input id="gen-lang" className="input" value={language} onChange={(e) => setLanguage(e.target.value)} />
         </div>
-        <label className="flex items-center gap-2 pb-2 text-sm">
-          <input type="checkbox" checked={liveTrends} onChange={(e) => setLiveTrends(e.target.checked)} />
-          Check live trends on the web (slower, more current)
-        </label>
+        {canCheckTrends ? (
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={liveTrends} onChange={(e) => setLiveTrends(e.target.checked)} />
+            Check live trends with Google Search (slower, more current)
+          </label>
+        ) : (
+          <p className="pb-2 text-xs text-slate-500">Live trend search needs a free Gemini key.</p>
+        )}
       </div>
       <button type="button" className="btn btn-primary" onClick={generate} disabled={busy || topic.trim().length < 2}>
-        {busy ? (liveTrends ? "Researching trends and writing…" : "Writing…") : "✨ Generate"}
+        {busy ? (canCheckTrends && liveTrends ? "Researching trends and writing…" : "Writing…") : "✨ Generate"}
       </button>
+      <p className="text-xs text-slate-500">Using: {providerLabel}</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {result && (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          {result.notice && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">{result.notice}</p>}
           <section>
             <div className="mb-1 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Caption</h3>
@@ -193,6 +208,12 @@ export function GeneratorPanel({
           </section>
 
           <p className="text-xs text-slate-500"><strong>Style notes:</strong> {result.styleNotes}</p>
+          <p className="text-xs text-slate-500">
+            Written by {result.provider}.{" "}
+            {result.liveChecked
+              ? "Hashtags were checked against current web results."
+              : "Hashtags were not checked against live trends, so double-check them before posting."}
+          </p>
           {result.sources.length > 0 && (
             <div className="text-xs text-slate-500">
               <strong>Trend sources:</strong>

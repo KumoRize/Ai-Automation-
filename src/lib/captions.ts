@@ -7,7 +7,8 @@ export interface CaptionInput {
   linkInCaption: boolean;
 }
 
-const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
+// \p{M} keeps combining marks (Urdu, Hindi, Arabic, Thai vowels) inside the tag.
+const HASHTAG_RE = /#[\p{L}\p{M}\p{N}_]+/gu;
 const URL_RE = /https?:\/\/\S+/g;
 
 export function extractHashtags(text: string): string[] {
@@ -18,7 +19,7 @@ export function extractHashtags(text: string): string[] {
 export function normalizeHashtags(input: string[] | string): string[] {
   const parts = Array.isArray(input) ? input : input.split(/[\s,]+/);
   const tags = parts
-    .map((p) => p.trim().replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, ""))
+    .map((p) => p.trim().replace(/^#+/, "").replace(/[^\p{L}\p{M}\p{N}_]/gu, ""))
     .filter(Boolean)
     .map((p) => `#${p}`);
   return [...new Set(tags)];
@@ -61,7 +62,10 @@ function truncate(text: string, max: number): string {
   return chars.length <= max ? text : chars.slice(0, max - 1).join("").trimEnd() + "…";
 }
 
-/** Keeps the first `max` hashtags and removes the rest (Instagram allows 30). */
+/** Instagram rejects posts with more than 5 hashtags (limit since December 2025). */
+export const INSTAGRAM_MAX_HASHTAGS = 5;
+
+/** Keeps the first `max` hashtags and removes the rest. */
 function capHashtags(text: string, max: number): string {
   let count = 0;
   return text
@@ -97,7 +101,7 @@ export function captionFor(platform: Platform, input: CaptionInput): string {
   switch (platform) {
     case "instagram":
       // Links in Instagram captions aren't clickable; a keyword DM automation is the way to deliver them.
-      return truncate(capHashtags(withLink, 30), 2200);
+      return truncate(capHashtags(withLink, INSTAGRAM_MAX_HASHTAGS), 2200);
     case "facebook":
       return truncate(withLink, 63000);
     case "tiktok":

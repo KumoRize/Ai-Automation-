@@ -5,11 +5,17 @@ export function parseKeywords(input: string | string[]): string[] {
   return [...new Set(parts.map((k) => k.trim()).filter(Boolean))];
 }
 
+/**
+ * Lowercases and turns punctuation into spaces so "LINK!!", "#link" and "link" all match "link".
+ * Letters with their combining marks (Urdu, Hindi, Arabic...), digits and emoji are kept.
+ */
 function normalize(text: string): string {
   return text
     .normalize("NFKC")
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}#@\s]/gu, " ")
+    .replace(/[\uFE0E\uFE0F\u200D]/g, "") // emoji variation selectors and joiners
+    .replace(/[^\p{L}\p{M}\p{N}\p{Extended_Pictographic}\s]/gu, " ")
+    .replace(/(\p{Extended_Pictographic})/gu, " $1 ")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -170,23 +170,26 @@ export const youtube: PlatformAdapter = {
     const url = `${API}/commentThreads?part=snippet&videoId=${encodeURIComponent(videoId)}&order=time&maxResults=50&textFormat=plainText`;
     const res = await requestJson<CommentThreads>(url, { headers: bearer(creds) });
     const since = cursor ? Date.parse(cursor) : 0;
-    let newest = cursor;
-    const comments = (res.items ?? [])
+    const fresh = (res.items ?? [])
       .map((t) => t.snippet.topLevelComment)
-      .filter((c) => Date.parse(c.snippet.publishedAt) > since)
+      // >= so comments sharing the cursor's second aren't skipped; already-seen ones are ignored later.
+      .filter((c) => Date.parse(c.snippet.publishedAt) >= since);
+    // Advance past everything seen, including the channel's own comments.
+    let newest = cursor;
+    for (const c of fresh) {
+      if (!newest || Date.parse(c.snippet.publishedAt) > Date.parse(newest)) newest = c.snippet.publishedAt;
+    }
+    const comments = fresh
       .filter((c) => c.snippet.authorChannelId?.value !== creds.externalId)
-      .map((c) => {
-        if (!newest || Date.parse(c.snippet.publishedAt) > Date.parse(newest)) newest = c.snippet.publishedAt;
-        return {
-          platform: "youtube" as const,
-          accountExternalId: creds.externalId,
-          commentId: c.id,
-          postExternalId: videoId,
-          authorId: c.snippet.authorChannelId?.value ?? null,
-          authorName: c.snippet.authorDisplayName,
-          text: c.snippet.textOriginal,
-        };
-      });
+      .map((c) => ({
+        platform: "youtube" as const,
+        accountExternalId: creds.externalId,
+        commentId: c.id,
+        postExternalId: videoId,
+        authorId: c.snippet.authorChannelId?.value ?? null,
+        authorName: c.snippet.authorDisplayName,
+        text: c.snippet.textOriginal,
+      }));
     return { comments, cursor: newest ?? new Date().toISOString() };
   },
 };

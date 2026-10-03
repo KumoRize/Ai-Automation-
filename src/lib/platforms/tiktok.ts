@@ -80,7 +80,7 @@ export const tiktok: PlatformAdapter = {
   authUrl(state) {
     const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
     url.searchParams.set("client_key", config.tiktok.clientKey!);
-    url.searchParams.set("scope", "user.info.basic,video.publish,video.upload");
+    url.searchParams.set("scope", "user.info.basic,video.publish");
     url.searchParams.set("response_type", "code");
     url.searchParams.set("redirect_uri", callbackUrl("tiktok"));
     url.searchParams.set("state", state);
@@ -137,6 +137,8 @@ export const tiktok: PlatformAdapter = {
     const privacy = await privacyLevel(creds);
 
     if (post.media_type === "image") {
+      if (post.media_mime !== "image/jpeg")
+        throw new PlatformError("TikTok photo posts accept JPEG (or WebP) only. Convert the image to .jpg and try again.");
       const res = await requestJson<{ data: { publish_id: string } }>(`${API}/post/publish/content/init/`, {
         method: "POST",
         headers: bearer(creds),

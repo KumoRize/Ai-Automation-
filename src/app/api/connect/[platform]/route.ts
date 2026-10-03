@@ -8,17 +8,22 @@ import { isPlatform } from "@/lib/types";
 
 const back = (query: string) => NextResponse.redirect(new URL(`/accounts?${query}`, config.appUrl));
 
-/** Starts the OAuth flow for a platform, or adds a demo account with ?demo=1. */
-export async function GET(request: NextRequest, ctx: RouteContext<"/api/connect/[platform]">) {
+/** Adds a demo account. A POST (from a form) so other sites can't trigger it with a link. */
+export async function POST(_request: NextRequest, ctx: RouteContext<"/api/connect/[platform]">) {
+  const denied = await requireAuth();
+  if (denied) return NextResponse.redirect(new URL("/login", config.appUrl), 303);
+  const { platform } = await ctx.params;
+  if (!isPlatform(platform)) return NextResponse.redirect(new URL("/accounts?error=Unknown+platform", config.appUrl), 303);
+  createDemoAccount(platform);
+  return NextResponse.redirect(new URL("/accounts?connected=demo", config.appUrl), 303);
+}
+
+/** Starts the OAuth login for a platform. */
+export async function GET(_request: NextRequest, ctx: RouteContext<"/api/connect/[platform]">) {
   const denied = await requireAuth();
   if (denied) return NextResponse.redirect(new URL("/login", config.appUrl));
   const { platform } = await ctx.params;
   if (!isPlatform(platform)) return back("error=Unknown+platform");
-
-  if (request.nextUrl.searchParams.get("demo") === "1") {
-    createDemoAccount(platform);
-    return back("connected=demo");
-  }
 
   const a = adapter(platform);
   if (!a.isConfigured()) return back(`error=${encodeURIComponent(`Set ${a.requiredEnv.join(", ")} first.`)}`);

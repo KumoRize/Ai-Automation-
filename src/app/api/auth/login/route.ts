@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   const now = Date.now();
+  for (const [key, value] of attempts) if (now - value.first >= WINDOW_MS) attempts.delete(key);
   const entry = attempts.get(ip);
   if (entry && now - entry.first < WINDOW_MS && entry.count >= MAX_ATTEMPTS)
     return NextResponse.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });

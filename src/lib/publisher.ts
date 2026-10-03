@@ -46,10 +46,11 @@ export function createPost(input: NewPost): string {
   );
   for (const account of accounts) {
     run(
-      "INSERT INTO post_targets (id, post_id, account_id, platform, status) VALUES (?, ?, ?, ?, 'pending')",
+      "INSERT INTO post_targets (id, post_id, account_id, account_name, platform, status) VALUES (?, ?, ?, ?, ?, 'pending')",
       randomId(12),
       id,
       account.id,
+      account.username,
       account.platform,
     );
   }
@@ -67,7 +68,8 @@ export function listPosts(limit = 50): PostWithTargets[] {
   return posts.map((p) => ({
     ...p,
     targets: all<PostTargetRow & { username: string }>(
-      `SELECT t.*, a.username FROM post_targets t JOIN accounts a ON a.id = t.account_id
+      `SELECT t.*, COALESCE(a.username, t.account_name || ' (disconnected)') AS username
+       FROM post_targets t LEFT JOIN accounts a ON a.id = t.account_id
        WHERE t.post_id = ? ORDER BY t.platform`,
       p.id,
     ),
@@ -84,8 +86,8 @@ export function deletePost(id: string): void {
 async function publishTarget(post: PostRow, target: PostTargetRow): Promise<void> {
   run("UPDATE post_targets SET status = 'publishing', error = NULL WHERE id = ?", target.id);
   try {
-    const account = getAccount(target.account_id);
-    if (!account) throw new Error("The account was disconnected.");
+    const account = target.account_id ? getAccount(target.account_id) : undefined;
+    if (!account) throw new Error("This account was disconnected. Reconnect it and click Retry.");
     if (!supportsMedia(account.platform, post.media_type))
       throw new Error(
         post.media_type === "none"
@@ -145,11 +147,18 @@ export async function publishPost(postId: string): Promise<void> {
   }
 }
 
-export async function publishDuePosts(): Promise<number> {
+/**
+ * Starts every scheduled post that is due. With `wait: false` it returns right away, so a slow
+ * video upload doesn't hold up the next minute's posts (each post is marked "publishing" at once).
+ */
+export async function publishDuePosts({ wait }: { wait: boolean }): Promise<number> {
   const due = all<{ id: string }>(
     "SELECT id FROM posts WHERE status = 'scheduled' AND scheduled_at <= ?",
     Date.now(),
   );
-  await Promise.allSettled(due.map((p) => publishPost(p.id)));
+  const runs = due.map((p) =>
+    publishPost(p.id).catch((err) => console.error(`[scheduler] publishing ${p.id} failed:`, err)),
+  );
+  if (wait) await Promise.all(runs);
   return due.length;
 }

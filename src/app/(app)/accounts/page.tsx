@@ -73,7 +73,9 @@ export default async function AccountsPage({ searchParams }: PageProps<"/account
                 ) : (
                   <a href="/setup" className="btn btn-sm">How to connect</a>
                 )}
-                <a href={`/api/connect/${platform}?demo=1`} className="btn btn-sm">Add demo account</a>
+                <form method="post" action={`/api/connect/${platform}`}>
+                  <button className="btn btn-sm">Add demo account</button>
+                </form>
               </div>
             </div>
           );

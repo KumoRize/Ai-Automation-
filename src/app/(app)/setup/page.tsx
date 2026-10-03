@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { aiConfigured } from "@/lib/ai";
+import { aiStatus } from "@/lib/ai";
 import { callbackUrl, config } from "@/lib/config";
 import { adapters } from "@/lib/platforms";
 import { PLATFORMS, type Platform } from "@/lib/types";
@@ -24,6 +24,7 @@ function Code({ children }: { children: string }) {
 export default async function SetupPage() {
   await connection();
   const isLocal = config.appUrl.includes("localhost") || config.appUrl.includes("127.0.0.1");
+  const ai = aiStatus();
 
   return (
     <div className="space-y-6">
@@ -44,7 +45,18 @@ export default async function SetupPage() {
 
       <div className="card space-y-2 text-sm">
         <p className="font-medium">General</p>
-        <p><Check ok={aiConfigured()} /> AI generator: <Code>ANTHROPIC_API_KEY</Code></p>
+        <p>
+          <Check ok={ai.provider !== "basic"} /> AI generator: <strong>{ai.label}</strong>
+          {ai.problem && <span className="text-red-600"> ({ai.problem})</span>}
+        </p>
+        {ai.provider === "basic" && (
+          <p className="pl-5 text-slate-600">
+            Free upgrade: get a Google Gemini key at{" "}
+            <a className="text-brand-600 underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>{" "}
+            (no card needed) and set <Code>GEMINI_API_KEY</Code>. Other free options: <Code>GROQ_API_KEY</Code> from
+            console.groq.com, or <Code>OLLAMA_MODEL</Code> to run a model on your own computer.
+          </p>
+        )}
         <p><Check ok={Boolean(config.metaWebhookVerifyToken)} /> Meta comment webhooks: <Code>META_WEBHOOK_VERIFY_TOKEN</Code></p>
         <p className="pl-5 text-slate-600">
           Webhook callback URL for both the Instagram and the Facebook (Page) products: <Code>{`${config.appUrl}/api/webhooks/meta`}</Code>.

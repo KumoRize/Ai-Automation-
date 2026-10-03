@@ -86,6 +86,49 @@ CREATE TABLE IF NOT EXISTS oauth_states (
 );
 `;
 
+/**
+ * Changes to apply on top of SCHEMA, in order. PRAGMA user_version records how many have run,
+ * so existing databases are upgraded in place.
+ */
+const MIGRATIONS: string[] = [
+  // 1: Keep post history when an account is disconnected (was ON DELETE CASCADE) and remember its name.
+  `CREATE TABLE post_targets_v2 (
+     id TEXT PRIMARY KEY,
+     post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+     account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+     account_name TEXT NOT NULL DEFAULT '',
+     platform TEXT NOT NULL,
+     status TEXT NOT NULL,
+     external_id TEXT,
+     external_url TEXT,
+     error TEXT,
+     poll_cursor TEXT,
+     published_at INTEGER
+   );
+   INSERT INTO post_targets_v2
+     SELECT t.id, t.post_id, t.account_id, COALESCE(a.username, ''), t.platform, t.status,
+            t.external_id, t.external_url, t.error, t.poll_cursor, t.published_at
+     FROM post_targets t LEFT JOIN accounts a ON a.id = t.account_id;
+   DROP TABLE post_targets;
+   ALTER TABLE post_targets_v2 RENAME TO post_targets;
+   CREATE INDEX IF NOT EXISTS post_targets_external ON post_targets (platform, external_id);`,
+];
+
+function migrate(conn: DatabaseSync): void {
+  const { user_version: version } = conn.prepare("PRAGMA user_version").get() as { user_version: number };
+  for (let i = version; i < MIGRATIONS.length; i++) {
+    conn.exec("BEGIN");
+    try {
+      conn.exec(MIGRATIONS[i]);
+      conn.exec(`PRAGMA user_version = ${i + 1}`);
+      conn.exec("COMMIT");
+    } catch (err) {
+      conn.exec("ROLLBACK");
+      throw err;
+    }
+  }
+}
+
 const globalForDb = globalThis as unknown as { __socialDb?: DatabaseSync };
 
 export function db(): DatabaseSync {
@@ -94,6 +137,7 @@ export function db(): DatabaseSync {
     const conn = new DatabaseSync(path.join(config.dataDir, "app.db"));
     conn.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     conn.exec(SCHEMA);
+    migrate(conn);
     globalForDb.__socialDb = conn;
   }
   return globalForDb.__socialDb;

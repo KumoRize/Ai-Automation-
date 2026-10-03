@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GeneratorPanel } from "@/components/GeneratorPanel";
 import { PlatformBadge } from "@/components/ui";
+import { extractHashtags, INSTAGRAM_MAX_HASHTAGS } from "@/lib/captions";
 import { PLATFORM_LABELS, type MediaType, type Platform } from "@/lib/types";
 
 export interface Support {
@@ -26,13 +27,13 @@ export function ComposeForm({
   support,
   accept,
   maxUploadMb,
-  aiEnabled,
+  ai,
 }: {
   accounts: Account[];
   support: Record<Platform, Support>;
   accept: string;
   maxUploadMb: number;
-  aiEnabled: boolean;
+  ai: { label: string; liveTrends: boolean };
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -52,7 +53,12 @@ export function ComposeForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const mediaType: MediaType = !file ? "none" : file.type.startsWith("video/") ? "video" : "image";
+  const mediaType: MediaType = !file
+    ? "none"
+    : file.type.startsWith("video/") || /\.(mp4|mov)$/i.test(file.name)
+      ? "video"
+      : "image";
+  const isPng = Boolean(file && (file.type === "image/png" || /\.png$/i.test(file.name)));
 
   useEffect(() => {
     if (!file) return setPreview(null);
@@ -80,6 +86,8 @@ export function ComposeForm({
     if (!selected.size) return setError("Pick at least one account.");
     if (file && file.size > maxUploadMb * 1024 * 1024) return setError(`The file is larger than ${maxUploadMb} MB.`);
     if (when === "later" && !scheduledAt) return setError("Pick a date and time, or choose Post now.");
+    if (when === "later" && new Date(scheduledAt).getTime() <= Date.now())
+      return setError("The schedule time is in the past. Pick a future time or choose Post now.");
 
     const form = new FormData();
     if (file) form.append("file", file);
@@ -153,18 +161,16 @@ export function ComposeForm({
 
           {showAi && (
             <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-4">
-              {aiEnabled ? (
-                <GeneratorPanel
-                  initialTopic={caption}
-                  onUseCaption={(text) => {
-                    setCaption(text);
-                    setShowAi(false);
-                  }}
-                  onUseTitle={setTitle}
-                />
-              ) : (
-                <p className="text-sm text-slate-600">Set ANTHROPIC_API_KEY to turn on the AI generator.</p>
-              )}
+              <GeneratorPanel
+                initialTopic={caption}
+                providerLabel={ai.label}
+                canCheckTrends={ai.liveTrends}
+                onUseCaption={(text) => {
+                  setCaption(text);
+                  setShowAi(false);
+                }}
+                onUseTitle={setTitle}
+              />
             </div>
           )}
 
@@ -223,6 +229,19 @@ export function ComposeForm({
               </label>
             );
           })}
+          {extractHashtags(caption).length > INSTAGRAM_MAX_HASHTAGS &&
+            accounts.some((a) => selected.has(a.id) && a.platform === "instagram") && (
+              <p className="text-xs text-amber-700">
+                Instagram allows {INSTAGRAM_MAX_HASHTAGS} hashtags per post. Only the first {INSTAGRAM_MAX_HASHTAGS} will
+                be kept there; other platforms get them all.
+              </p>
+            )}
+          {isPng &&
+            accounts.some((a) => selected.has(a.id) && (a.platform === "instagram" || a.platform === "tiktok")) && (
+              <p className="text-xs text-amber-700">
+                Instagram and TikTok only accept JPEG photos. Save the image as .jpg, or untick them.
+              </p>
+            )}
           {unsupported.length > 0 && (
             <p className="text-xs text-amber-700">
               {[...new Set(unsupported)].map((p) => PLATFORM_LABELS[p]).join(", ")} can&apos;t take this kind of post and will be marked failed. Untick them or change the file.

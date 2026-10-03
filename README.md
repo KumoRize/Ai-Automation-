@@ -2,7 +2,7 @@
 
 Upload a post once and publish it to Instagram, Facebook, TikTok, YouTube and X at the same time. Keyword comment automation (like ManyChat) sends people your link by DM, and an AI generator writes trending hashtags, keywords and captions in your style.
 
-It's free and open source. You run it yourself, and each platform's API is free to use, except X, which charges per post (see [Costs](#costs)).
+It's free and open source. You run it yourself, and the AI generator runs on free services (or with no key at all). Each platform's API is free to use, except X, which charges per post (see [Costs](#costs)).
 
 ## Features
 
@@ -12,7 +12,7 @@ It's free and open source. You run it yourself, and each platform's API is free 
 | **Keyword DM automation** | Set trigger words per post or for all posts. When someone comments "LINK", they get a DM with your link and an optional public reply. |
 | **Comment auto-replies** | Reply publicly to every comment, or only to comments with certain words. |
 | **Direct links** | Save a link on each post. It can go in the caption, in the DM, or both. |
-| **AI generator** | Describe your post and get 15–25 hashtags, search keywords, a hook, a title and a caption in your chosen style. It can check live web trends first. |
+| **AI generator (free)** | Describe your post and get hashtags, search keywords, a hook, a title and a caption in your chosen style. It runs on Google Gemini's free tier, which can also check live trends with Google Search, or on Groq or Ollama, also free. With no key it falls back to a built-in Basic mode, so it always works. |
 | **Demo accounts** | Try every feature without connecting real accounts. Nothing gets posted. |
 | **Activity log** | Shows each comment received, which rule it matched, and what was sent. |
 
@@ -21,7 +21,7 @@ It's free and open source. You run it yourself, and each platform's API is free 
 | | Instagram | Facebook Page | TikTok | YouTube | X |
 |---|---|---|---|---|---|
 | Text post | – | ✓ | – | – | ✓ |
-| Image | ✓ (JPEG) | ✓ | ✓ | – | ✓ |
+| Image | ✓ (JPEG) | ✓ | ✓ (JPEG) | – | ✓ |
 | Video | ✓ (Reels) | ✓ | ✓ | ✓ | ✓ |
 | Public comment reply | ✓ | ✓ | – | ✓ | ✓ |
 | DM to commenter | ✓ | ✓ | – | – | ✓ |
@@ -45,7 +45,19 @@ Open http://localhost:3000 and log in with your password. Then:
 2. Go to **Create post**, add a photo, turn on **Keyword DM automation**, and publish.
 3. Go to **Automations** and use **Test a comment** to see the DM the rule would send.
 
-To try the AI generator, set `ANTHROPIC_API_KEY` (get one at [console.anthropic.com](https://console.anthropic.com)).
+The AI generator works right away in **Basic mode** (templates, no key). For real AI captions and live trending hashtags, add a free key (see the next section).
+
+## Free AI setup
+
+Pick one and add it to `.env.local`, then restart. All three cost nothing.
+
+| Option | How to get it | What you get |
+|---|---|---|
+| **Google Gemini** (recommended) | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No card needed. Set `GEMINI_API_KEY`. | Good captions, plus **live trend checks with Google Search** on the free daily allowance of `gemini-2.5-flash` |
+| **Groq** | Create a key at [console.groq.com/keys](https://console.groq.com/keys). Set `GROQ_API_KEY`. | Very fast Llama 3.3 70B. No live trend search |
+| **Ollama** | Install [ollama.com](https://ollama.com), run `ollama pull llama3.1`, set `OLLAMA_MODEL=llama3.1` | Runs on your own computer: private, no limits, no internet needed |
+
+Free tiers have rate limits that Google and Groq can change at any time; check your current limits in their dashboards. If the AI service fails or the free limit runs out, the app shows Basic mode results with a note explaining why, so you're never left with nothing. Any other OpenAI-compatible service (OpenRouter, LM Studio) works too, through `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL`.
 
 ## Connecting real accounts
 
@@ -56,19 +68,20 @@ Each platform needs a free developer app. The **Setup** page in the app lists th
 | Platform | Where to create the app | What to enable | Env vars |
 |---|---|---|---|
 | Instagram | [Meta for Developers](https://developers.facebook.com/apps) → Business app → **Instagram API with Instagram Login** | Permissions: `instagram_business_basic`, `instagram_business_content_publish`, `instagram_business_manage_comments`, `instagram_business_manage_messages`. Webhook field: **comments** | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` |
-| Facebook | Same Meta app → **Facebook Login for Business** + **Pages API** | Permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`. Page webhook field: **feed** | `META_APP_ID`, `META_APP_SECRET` |
+| Facebook | Same Meta app → **Facebook Login for Business** + **Pages API** | Permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`. Page webhook field: **feed**. If the dashboard gives you a *configuration ID*, set `META_LOGIN_CONFIG_ID` | `META_APP_ID`, `META_APP_SECRET` |
 | Meta webhooks | Meta app → Webhooks (Instagram and Page objects) | Callback `APP_URL/api/webhooks/meta`, with any verify token you choose | `META_WEBHOOK_VERIFY_TOKEN` |
-| TikTok | [TikTok for Developers](https://developers.tiktok.com/apps) | Login Kit + Content Posting API (Direct Post). Scopes: `user.info.basic`, `video.publish`, `video.upload` | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` |
+| TikTok | [TikTok for Developers](https://developers.tiktok.com/apps) | Login Kit + Content Posting API (Direct Post). Scopes: `user.info.basic`, `video.publish` | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` |
 | YouTube | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | Enable YouTube Data API v3. Create an OAuth client of type Web application | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | X | [X Developer Console](https://developer.x.com/en/portal/dashboard) | User authentication: OAuth 2.0, type Web App, read + write + DM | `X_CLIENT_ID`, `X_CLIENT_SECRET` |
 
-Restart the app after changing env vars, then use **Connect** on the Accounts page.
+Restart the app after changing env vars, then use **Connect** on the Accounts page. Open the app at the same address as `APP_URL` when you connect, because the login comes back to that address and needs your session there.
 
 ### Platform approvals you should know about
 
 These limits come from the platforms, not from this app:
 
-- **Instagram and Facebook:** until Meta App Review approves your permissions, only people with a role on your Meta app (you and your testers) can connect. Instagram publishing only works with Professional (Business or Creator) accounts. A comment can get one private-reply DM, within 7 days of the comment. ([Meta docs](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/content-publishing))
+- **Instagram and Facebook:** until Meta App Review approves your permissions, only people with a role on your Meta app (you and your testers) can connect. Instagram publishing only works with Professional (Business or Creator) accounts. A comment can get one private-reply DM, within 7 days of the comment. Instagram photos must be JPEG.
+- **Instagram hashtags:** since December 2025, Instagram rejects posts with more than 5 hashtags. The app keeps the first 5 on Instagram, and other platforms get all of them, so put your best tags first ([report](https://techbuild.africa/instagram-posts-and-reels-to-five-hashtags/)). ([Meta docs](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/content-publishing))
 - **TikTok:** until your app passes TikTok's audit, posts are private ("Only me") and at most 5 accounts can post per day. ([TikTok docs](https://developers.tiktok.com/doc/content-sharing-guidelines))
 - **YouTube:** videos uploaded by API projects that Google hasn't audited are locked to private. Each upload uses 1,600 of the default 10,000 daily quota units, so about 6 uploads a day.
 - **X:** see Costs below.
@@ -78,7 +91,7 @@ These limits come from the platforms, not from this app:
 - **This app** is free.
 - **Meta, TikTok and YouTube APIs** are free to use.
 - **X** closed its free API tier to new projects in February 2026, according to reports, and now bills each call: about $0.015 per text post and about $0.20 per post with a link ([source](https://www.postproxy.dev/blog/x-api-pricing-2026/), third party; check current prices in the X developer console). Reading replies for reply automation is also billed, which is why `X_POLL_REPLIES` is off by default.
-- **AI generator:** billed by Anthropic per use. Live trend search adds a web-search charge. Turn it off in the generator for cheaper, faster results.
+- **AI generator:** free. Gemini and Groq free tiers have daily and per-minute limits; Ollama and Basic mode have none.
 
 ## Deploying
 
@@ -94,6 +107,7 @@ Social Autopilot is a standard Next.js app that keeps its data in a SQLite file 
 - The app has one user and a single password. Logins are rate-limited.
 - Platform tokens are encrypted at rest (AES-256-GCM) with a key derived from `APP_SECRET`. Changing `APP_SECRET` logs you out and requires reconnecting accounts.
 - Meta webhooks are checked against the `X-Hub-Signature-256` signature. Unsigned calls are rejected.
+- Actions that change data only accept same-site requests, so other websites can't trigger them through your session.
 - Uploaded media is served at `/media/<random-id>` without login, because the platforms have to download it. Don't upload anything you wouldn't post.
 
 ## Project layout
@@ -106,7 +120,7 @@ src/
   lib/platforms/      One adapter per platform (OAuth, publish, reply, DM, comment polling)
   lib/publisher.ts    Publishing to all selected accounts, with retries and status
   lib/automation.ts   Keyword matching and comment → reply/DM handling
-  lib/ai.ts           Claude-powered hashtag/keyword/caption generator
+  lib/ai/             Free AI generator: Gemini, Groq/Ollama/OpenAI-compatible, and offline Basic mode
   lib/scheduler.ts    Scheduled posts and YouTube/X comment polling
 tests/                Unit tests (npm test)
 ```
@@ -123,10 +137,10 @@ npm run typecheck   # TypeScript
 
 Built and checked so far:
 
-- Unit tests cover caption limits, keyword matching, webhook parsing and signatures, encryption and sessions.
-- End to end with demo accounts: login, publishing, scheduling, webhook-triggered DMs, duplicate-comment protection, and the cron endpoint.
+- 50 unit tests. They cover caption limits (including Instagram's 5 hashtags), keyword matching in any language and with emoji, webhook parsing and signatures, encryption and sessions. Fake-API tests check the exact requests each platform integration and AI provider sends: Instagram, Facebook, TikTok, YouTube, X, Gemini, and Groq/Ollama.
+- End to end with demo accounts: login, publishing, scheduling, webhook-triggered DMs, duplicate-comment protection, the cron endpoint, and the AI generator in Basic mode.
 
-Not yet checked: the real platform API calls and the AI generator have never run against live services, because that needs your developer apps and API keys. The X media upload in particular follows X's documented v2 endpoints but hasn't been run live. If a platform returns an error, it appears on the **Posts** page next to that account.
+Not yet checked: the real platform APIs and the free AI services have never been called with real keys, because that needs your developer apps and keys. If a platform returns an error, it appears on the **Posts** page next to that account. If the AI fails, the generator shows why and falls back to Basic mode.
 
 ## Roadmap ideas
 

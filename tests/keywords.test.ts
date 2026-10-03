@@ -33,6 +33,14 @@ describe("keywordMatches", () => {
     expect(keywordMatches("guide please", ["guide"], "exact")).toBe(false);
   });
 
+  it("matches #keyword, emoji keywords and Hindi/Urdu words", () => {
+    expect(keywordMatches("#link please", ["link"], "contains")).toBe(true);
+    expect(keywordMatches("❤️❤️", ["❤"], "contains")).toBe(true);
+    expect(keywordMatches("i want 🔥", ["🔥"], "contains")).toBe(true);
+    expect(keywordMatches("मुझे लिंक भेजो", ["लिंक"], "contains")).toBe(true);
+    expect(keywordMatches("لنک چاہیے", ["لنک"], "contains")).toBe(true);
+  });
+
   it("'any' matches every non-empty comment", () => {
     expect(keywordMatches("nice", [], "any")).toBe(true);
     expect(keywordMatches("  ", [], "any")).toBe(false);

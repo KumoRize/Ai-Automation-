@@ -37,7 +37,12 @@ export const facebook: PlatformAdapter = {
     url.searchParams.set("client_id", config.facebook.appId!);
     url.searchParams.set("redirect_uri", callbackUrl("facebook"));
     url.searchParams.set("state", state);
-    url.searchParams.set("scope", SCOPES.join(","));
+    if (config.facebook.loginConfigId) {
+      // Facebook Login for Business: permissions come from the configuration in the Meta dashboard.
+      url.searchParams.set("config_id", config.facebook.loginConfigId);
+    } else {
+      url.searchParams.set("scope", SCOPES.join(","));
+    }
     url.searchParams.set("response_type", "code");
     return url.toString();
   },
